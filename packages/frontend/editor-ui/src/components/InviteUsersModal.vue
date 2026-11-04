@@ -17,6 +17,7 @@ import { createFormEventBus } from '@n8n/design-system/utils';
 import { createEventBus } from '@n8n/utils/event-bus';
 import { useClipboard } from '@/composables/useClipboard';
 import { useI18n } from '@n8n/i18n';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 import { usePageRedirectionHelper } from '@/composables/usePageRedirectionHelper';
 
 const NAME_EMAIL_FORMAT_REGEX = /^.* <(.*)>$/;
@@ -167,6 +168,15 @@ async function onSubmit() {
 		const successfulUrlInvites = invited.filter(
 			(invite) => !invite.error && !invite.user.emailSent,
 		);
+
+		// Pendo: invite request resolved; counts come from the API response
+		trackPendoEvent('users_invited', {
+			role: role.value,
+			invite_count: emailList.length,
+			email_invites_sent_count: successfulEmailInvites.length,
+			url_invites_created_count: successfulUrlInvites.length,
+			errored_invites_count: erroredInvites.length,
+		});
 
 		if (successfulEmailInvites.length) {
 			showMessage({

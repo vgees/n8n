@@ -23,6 +23,7 @@ import { ProjectTypes } from '@/types/projects.types';
 import { getResourcePermissions } from '@n8n/permissions';
 import { useI18n } from '@n8n/i18n';
 import { useTelemetry } from '@/composables/useTelemetry';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 
 const route = useRoute();
 const i18n = useI18n();
@@ -368,6 +369,12 @@ const saveSettings = async () => {
 	telemetry.track('User updated workflow settings', {
 		workflow_id: workflowsStore.workflowId,
 		// null and undefined values are removed from the object, but we need the keys to be there
+		time_saved: workflowSettings.value.timeSavedPerExecution ?? '',
+		error_workflow: workflowSettings.value.errorWorkflow ?? '',
+	});
+	// Pendo: workflow settings saved
+	trackPendoEvent('workflow_settings_updated', {
+		workflow_id: workflowsStore.workflowId,
 		time_saved: workflowSettings.value.timeSavedPerExecution ?? '',
 		error_workflow: workflowSettings.value.errorWorkflow ?? '',
 	});

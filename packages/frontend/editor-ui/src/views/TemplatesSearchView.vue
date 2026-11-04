@@ -17,6 +17,7 @@ import { useDocumentTitle } from '@/composables/useDocumentTitle';
 import { useI18n } from '@n8n/i18n';
 import { useRoute, onBeforeRouteLeave, useRouter } from 'vue-router';
 import { useTelemetry } from '@/composables/useTelemetry';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 
 interface ISearchEvent {
 	search_string: string;
@@ -198,6 +199,16 @@ const trackSearch = () => {
 			'User searched workflow templates',
 			searchEventToTrack.value as unknown as IDataObject,
 		);
+		// Pendo: debounced template search returned results
+		trackPendoEvent('templates_searched', {
+			search_string: searchEventToTrack.value.search_string.slice(0, 100),
+			categories_applied: searchEventToTrack.value.categories_applied
+				.map((category) => category?.name)
+				.filter((name): name is string => typeof name === 'string'),
+			workflow_results_count: searchEventToTrack.value.workflow_results_count,
+			collection_results_count: searchEventToTrack.value.collection_results_count,
+			wf_template_repo_session_id: searchEventToTrack.value.wf_template_repo_session_id,
+		});
 		searchEventToTrack.value = null;
 	}
 };

@@ -5,6 +5,7 @@ import { useToast } from '@/composables/useToast';
 import { computed, onMounted, ref } from 'vue';
 import type { IFormBoxConfig } from '@/Interface';
 import { VIEWS } from '@/constants';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 import { useUsersStore } from '@/stores/users.store';
 import { useI18n } from '@n8n/i18n';
 import { useRoute, useRouter } from 'vue-router';
@@ -128,6 +129,12 @@ async function onSubmit(values: { [key: string]: string | boolean }) {
 				await usersStore.submitContactEmail(values.email.toString(), values.agree);
 			} catch {}
 		}
+
+		// Pendo: invited user finished activating their account
+		trackPendoEvent('invitation_accepted', {
+			inviter_id: inviterId.value,
+			agree_to_contact: values.agree === true,
+		});
 
 		await router.push({ name: VIEWS.HOMEPAGE });
 	} catch (error) {

@@ -10,6 +10,7 @@ import { useUsersStore } from '@/stores/users.store';
 
 import type { IFormBoxConfig } from '@/Interface';
 import { VIEWS } from '@/constants';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 
 import AuthView from '@/views/AuthView.vue';
 
@@ -91,6 +92,11 @@ const onSubmit = async (values: { [key: string]: string | boolean }) => {
 				await usersStore.submitContactEmail(values.email.toString(), values.agree);
 			} catch {}
 		}
+		// Pendo: instance owner account created (one-time setup milestone, enforced by the backend)
+		trackPendoEvent('owner_setup_completed', {
+			agree_to_contact: values.agree === true,
+			redirect_target: forceRedirectedHere ? VIEWS.HOMEPAGE : VIEWS.USERS_SETTINGS,
+		});
 		if (forceRedirectedHere) {
 			await router.push({ name: VIEWS.HOMEPAGE });
 		} else {

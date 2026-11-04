@@ -12,6 +12,7 @@ import { useProjectsStore } from '@/stores/projects.store';
 import { useUIStore } from '@/stores/ui.store';
 import { useWorkflowsStore } from '@/stores/workflows.store';
 import { ProjectTypes } from '@/types/projects.types';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 import {
 	getTruncatedProjectName,
 	MAX_NAME_LENGTH,
@@ -131,6 +132,15 @@ const moveResource = async () => {
 		telemetry.track(`User successfully moved ${props.data.resourceType}`, {
 			[`${props.data.resourceType}_id`]: props.data.resource.id,
 			project_from_type: projectsStore.currentProject?.type ?? projectsStore.personalProject?.type,
+		});
+		// Pendo: resource successfully moved to another project
+		trackPendoEvent('resource_moved_to_project', {
+			resource_type: props.data.resourceType,
+			resource_id: props.data.resource.id,
+			project_from_type: projectsStore.currentProject?.type ?? projectsStore.personalProject?.type,
+			project_to_type: selectedProject.value.type,
+			share_used_credentials: shareUsedCredentials.value,
+			shared_credentials_count: shareUsedCredentials.value ? shareableCredentials.value.length : 0,
 		});
 		toast.showToast({
 			title: i18n.baseText('projects.move.resource.success.title', {

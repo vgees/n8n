@@ -28,6 +28,7 @@ import { useRolesStore } from '@/stores/roles.store';
 import { usePageRedirectionHelper } from '@/composables/usePageRedirectionHelper';
 import { useI18n } from '@n8n/i18n';
 import { telemetry } from '@/plugins/telemetry';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 
 const props = defineProps<{
 	data: {
@@ -154,9 +155,19 @@ const onSave = async () => {
 
 	try {
 		const workflowId = await saveWorkflowPromise();
+		const previousShareeIds = new Set((workflow.value.sharedWithProjects ?? []).map((p) => p.id));
+		const nextShareeIds = new Set(sharedWithProjects.value.map((p) => p.id));
 		await workflowsEEStore.saveWorkflowSharedWith({
 			workflowId,
 			sharedWithProjects: sharedWithProjects.value,
+		});
+		// Pendo: workflow sharing saved successfully
+		trackPendoEvent('workflow_sharing_saved', {
+			workflow_id: workflowId,
+			project_id_sharer: workflow.value.homeProject?.id,
+			sharee_count: nextShareeIds.size,
+			sharee_added_count: [...nextShareeIds].filter((id) => !previousShareeIds.has(id)).length,
+			sharee_removed_count: [...previousShareeIds].filter((id) => !nextShareeIds.has(id)).length,
 		});
 
 		toast.showMessage({

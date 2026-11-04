@@ -102,6 +102,7 @@ import { updateCurrentUserSettings } from '@/api/users';
 import { useExecutingNode } from '@/composables/useExecutingNode';
 import type { NodeExecuteBefore } from '@n8n/api-types/push/execution';
 import { isChatNode } from '@/utils/aiUtils';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 
 const defaults: Omit<IWorkflowDb, 'id'> & { settings: NonNullable<IWorkflowDb['settings']> } = {
 	name: '',
@@ -1511,6 +1512,14 @@ export const useWorkflowsStore = defineStore(STORES.WORKFLOWS, () => {
 
 		if (pushData.data.error) {
 			const node = getNodeByName(nodeName);
+			// Pendo: manual execution errored on a node
+			trackPendoEvent('execution_errored', {
+				error_title: pushData.data.error.message?.slice(0, 200),
+				node_type: node?.type,
+				node_type_version: node?.typeVersion,
+				node_id: node?.id,
+				workflow_id: workflowId.value,
+			});
 			telemetry.track(
 				'Manual exec errored',
 				{

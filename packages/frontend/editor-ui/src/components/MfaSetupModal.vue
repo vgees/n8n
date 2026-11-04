@@ -13,6 +13,7 @@ import { useToast } from '@/composables/useToast';
 import QrcodeVue from 'qrcode.vue';
 import { useClipboard } from '@/composables/useClipboard';
 import { useI18n } from '@n8n/i18n';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 
 // ---------------------------------------------------------------------------
 // #region Reactive properties
@@ -99,6 +100,10 @@ const onDownloadClick = () => {
 const onSetupClick = async () => {
 	try {
 		await userStore.enableMfa({ mfaCode: authenticatorCode.value });
+		// Pendo: MFA was successfully enabled for the current user
+		trackPendoEvent('mfa_enabled', {
+			recovery_codes_downloaded: recoveryCodesDownloaded.value,
+		});
 		closeDialog();
 		toast.showMessage({
 			type: 'success',

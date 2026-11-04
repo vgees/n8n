@@ -16,6 +16,7 @@ import { useNDVStore } from '@/stores/ndv.store';
 import { usePostHog } from '@/stores/posthog.store';
 import { useSettingsStore } from '@/stores/settings.store';
 import { useUIStore } from '@/stores/ui.store';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 
 export class Telemetry {
 	private pageEventQueue: Array<{ route: RouteLocation }>;
@@ -164,6 +165,10 @@ export class Telemetry {
 	}
 
 	trackAskAI(event: string, properties: IDataObject = {}) {
+		if (event === 'askAi.generationFinished') {
+			this.trackPendoAiCodeGenerationFinished('ask_ai', properties);
+		}
+
 		if (this.rudderStack) {
 			properties.session_id = useRootStore().pushRef;
 			properties.ndv_session_id = useNDVStore().pushRef;
@@ -178,6 +183,10 @@ export class Telemetry {
 	}
 
 	trackAiTransform(event: string, properties: IDataObject = {}) {
+		if (event === 'generationFinished') {
+			this.trackPendoAiCodeGenerationFinished('ai_transform', properties);
+		}
+
 		if (this.rudderStack) {
 			properties.session_id = useRootStore().pushRef;
 			properties.ndv_session_id = useNDVStore().pushRef;
@@ -189,6 +198,24 @@ export class Telemetry {
 					break;
 			}
 		}
+	}
+
+	/**
+	 * Pendo: AI code generation (Ask AI or AI Transform) finished.
+	 * Prompt and generated code are intentionally excluded.
+	 */
+	private trackPendoAiCodeGenerationFinished(
+		generationType: 'ask_ai' | 'ai_transform',
+		properties: IDataObject,
+	) {
+		const ndvStore = useNDVStore();
+		trackPendoEvent('ai_code_generation_finished', {
+			session_id: useRootStore().pushRef,
+			ndv_session_id: ndvStore.pushRef,
+			success: properties.hasError !== true,
+			node_type: ndvStore.activeNode?.type,
+			generation_type: generationType,
+		});
 	}
 
 	// We currently do not support tracking directly from within node implementation

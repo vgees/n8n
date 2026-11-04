@@ -26,6 +26,7 @@ import { useTelemetry } from './useTelemetry';
 import { useNodeHelpers } from './useNodeHelpers';
 import { tryToParseNumber } from '@/utils/typesUtils';
 import { useTemplatesStore } from '@/stores/templates.store';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 
 export function useWorkflowSaving({ router }: { router: ReturnType<typeof useRouter> }) {
 	const uiStore = useUIStore();
@@ -343,6 +344,16 @@ export function useWorkflowSaving({ router }: { router: ReturnType<typeof useRou
 				workflowDataRequest.parentFolderId = parentFolderId;
 			}
 			const workflowData = await workflowsStore.createNewWorkflow(workflowDataRequest);
+
+			// Pendo: new workflow created via the API (first save)
+			trackPendoEvent('workflow_created', {
+				workflow_id: workflowData.id,
+				node_count: workflowData.nodes?.length ?? 0,
+				parent_folder_id: workflowDataRequest.parentFolderId,
+				template_id: workflowDataRequest.meta?.templateId,
+				project_id: workflowData.homeProject?.id ?? workflowDataRequest.projectId,
+				tag_count: workflowDataRequest.tags?.length ?? 0,
+			});
 
 			workflowsStore.addWorkflow(workflowData);
 

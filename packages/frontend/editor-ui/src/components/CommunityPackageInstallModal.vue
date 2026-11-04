@@ -13,6 +13,7 @@ import { ref } from 'vue';
 import { useTelemetry } from '@/composables/useTelemetry';
 import { useI18n } from '@n8n/i18n';
 import { useNodeTypesStore } from '@/stores/nodeTypes.store';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 
 const communityNodesStore = useCommunityNodesStore();
 
@@ -46,6 +47,12 @@ const onInstallClick = async () => {
 			loading.value = true;
 			await communityNodesStore.installPackage(packageName.value);
 			await useNodeTypesStore().getNodeTypes();
+			// Pendo: community package installed and node types refreshed
+			trackPendoEvent('community_package_installed', {
+				package_name: packageName.value,
+				source: 'cnr settings page',
+				success: true,
+			});
 			loading.value = false;
 			modalBus.emit('close');
 			toast.showMessage({
@@ -53,6 +60,13 @@ const onInstallClick = async () => {
 				type: 'success',
 			});
 		} catch (error) {
+			// Pendo: community package install failed
+			trackPendoEvent('community_package_installed', {
+				package_name: packageName.value,
+				source: 'cnr settings page',
+				success: false,
+				error_status_code: typeof error?.httpStatusCode === 'number' ? error.httpStatusCode : null,
+			});
 			if (error.httpStatusCode && error.httpStatusCode === 400) {
 				infoTextErrorMessage.value = error.message;
 			} else {

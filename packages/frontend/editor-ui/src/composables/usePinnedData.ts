@@ -13,6 +13,7 @@ import { useWorkflowsStore } from '@/stores/workflows.store';
 import type { INodeUi, IRunDataDisplayMode } from '@/Interface';
 import { useExternalHooks } from '@/composables/useExternalHooks';
 import { useTelemetry } from '@/composables/useTelemetry';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 import type { MaybeRef } from 'vue';
 import { computed, unref } from 'vue';
 import { useRootStore } from '@n8n/stores/useRootStore';
@@ -218,6 +219,15 @@ export function usePinnedData(
 
 		void externalHooks.run('runData.onDataPinningSuccess', telemetryPayload);
 		telemetry.track('Ndv data pinning success', telemetryPayload);
+		// Pendo: data pinning in NDV succeeded
+		trackPendoEvent('data_pinned', {
+			pinning_source: source,
+			node_type: targetNode?.type,
+			push_ref: rootStore.pushRef,
+			data_size: telemetryPayload.data_size,
+			view: displayMode,
+			is_success: true,
+		});
 	}
 
 	function onSetDataError({
@@ -238,6 +248,17 @@ export function usePinnedData(
 			data_size: stringSizeInBytes(data.value),
 			view: displayMode,
 			run_index: runIndex,
+			error_type: errorType,
+		});
+
+		// Pendo: data pinning in NDV failed validation
+		trackPendoEvent('data_pinned', {
+			pinning_source: source,
+			node_type: targetNode?.type,
+			push_ref: rootStore.pushRef,
+			data_size: stringSizeInBytes(data.value),
+			view: displayMode,
+			is_success: false,
 			error_type: errorType,
 		});
 	}

@@ -61,6 +61,7 @@ import { type BaseTextKey, useI18n } from '@n8n/i18n';
 import { ProjectTypes } from '@/types/projects.types';
 import { useWorkflowSaving } from '@/composables/useWorkflowSaving';
 import { sanitizeFilename } from '@/utils/fileUtils';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 
 const props = defineProps<{
 	readOnly?: boolean;
@@ -471,6 +472,11 @@ async function onWorkflowMenuSelect(value: string): Promise<void> {
 			name = sanitizeFilename(name);
 
 			telemetry.track('User exported workflow', { workflow_id: workflowData.id });
+			// Pendo: workflow JSON file generated and downloaded
+			trackPendoEvent('workflow_exported', {
+				workflow_id: workflowData.id,
+				node_count: workflowData.nodes?.length ?? 0,
+			});
 			saveAs(blob, name + '.json');
 			break;
 		}

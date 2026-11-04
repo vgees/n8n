@@ -7,6 +7,7 @@ import { useI18n } from '@n8n/i18n';
 import { ref, computed, watch } from 'vue';
 import { createEventBus } from '@n8n/utils/event-bus';
 import { useTelemetry } from '@/composables/useTelemetry';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 import { useNpsSurveyStore } from '@/stores/npsSurvey.store';
 import { useStyles } from '@/composables/useStyles';
 
@@ -78,6 +79,11 @@ async function selectSurveyValue(value: string) {
 	telemetry.track('User responded value survey score', {
 		instance_id: rootStore.instanceId,
 		nps: form.value.value,
+	});
+	// Pendo: user submitted a value survey score
+	trackPendoEvent('nps_survey_responded', {
+		instance_id: rootStore.instanceId,
+		nps: Number(form.value.value),
 	});
 
 	await useNpsSurveyStore().respondNpsSurvey();

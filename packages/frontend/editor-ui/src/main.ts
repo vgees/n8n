@@ -24,6 +24,9 @@ import { FontAwesomePlugin } from './plugins/icons';
 import { createPinia, PiniaVuePlugin } from 'pinia';
 import { ChartJSPlugin } from '@/plugins/chartjs';
 import { SentryPlugin } from '@/plugins/sentry';
+import { initializePendo } from '@/plugins/pendo';
+
+initializePendo();
 
 const pinia = createPinia();
 

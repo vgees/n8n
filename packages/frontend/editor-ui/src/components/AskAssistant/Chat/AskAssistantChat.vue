@@ -25,6 +25,10 @@ const user = computed(() => ({
 const loadingMessage = computed(() => assistantStore.assistantThinkingMessage);
 
 async function onUserMessage(content: string, quickReplyType?: string, isFeedback = false) {
+	// Feedback quick replies refer to the latest assistant response
+	const ratedResponse = isFeedback
+		? [...assistantStore.chatMessages].reverse().find((msg) => msg.role === 'assistant')
+		: undefined;
 	// If there is no current session running, initialize the support chat session
 	if (!assistantStore.currentSessionId) {
 		await assistantStore.initSupportChat(content);
@@ -44,6 +48,12 @@ async function onUserMessage(content: string, quickReplyType?: string, isFeedbac
 			solution_count: solutionCount,
 			response: content,
 		});
+		if (ratedResponse) {
+			assistantStore.trackPendoReaction(
+				quickReplyType === 'all-good' ? 'positive' : 'negative',
+				ratedResponse.id,
+			);
+		}
 	}
 }
 

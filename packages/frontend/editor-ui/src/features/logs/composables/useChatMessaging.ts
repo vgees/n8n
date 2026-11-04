@@ -11,6 +11,7 @@ import type {
 	BinaryFileType,
 	IRunExecutionData,
 } from 'n8n-workflow';
+import { NodeConnectionTypes } from 'n8n-workflow';
 import { useToast } from '@/composables/useToast';
 import { useMessage } from '@/composables/useMessage';
 import { usePinnedData } from '@/composables/usePinnedData';
@@ -18,6 +19,7 @@ import { MODAL_CONFIRM } from '@/constants';
 import { useI18n } from '@n8n/i18n';
 import type { IExecutionPushResponse, INodeUi } from '@/Interface';
 import { extractBotResponse, getInputKey } from '@/features/logs/logs.utils';
+import { PENDO_AGENT_IDS, trackPendoAgent } from '@/utils/pendoUtils';
 
 export type RunWorkflowChatPayload = {
 	triggerNode: string;
@@ -154,7 +156,21 @@ export function useChatMessaging({
 
 		if (chatMessage !== undefined) {
 			messages.value.push(chatMessage);
+			trackPendoAgent('agent_response', {
+				agentId: PENDO_AGENT_IDS.workflowAgentChat,
+				conversationId: sessionId.value,
+				messageId: chatMessage.id,
+				content: chatMessage.type === 'component' ? '' : chatMessage.text,
+				toolsUsed: getExecutedToolNames(executionResultData.value?.runData),
+			});
 		}
+	}
+
+	/** Returns the names of the AI tool nodes that ran during the execution */
+	function getExecutedToolNames(runData?: IRunExecutionData['resultData']['runData']): string[] {
+		return Object.entries(runData ?? {})
+			.filter(([, taskData]) => taskData.some((run) => run.data?.[NodeConnectionTypes.AiTool]))
+			.map(([nodeName]) => nodeName);
 	}
 
 	/** Sends a message to the chat */
@@ -192,6 +208,14 @@ export function useChatMessaging({
 			files,
 		};
 		messages.value.push(newMessage);
+		trackPendoAgent('prompt', {
+			agentId: PENDO_AGENT_IDS.workflowAgentChat,
+			conversationId: sessionId.value,
+			messageId: newMessage.id,
+			content: newMessage.text,
+			suggestedPrompt: false,
+			fileUploaded: !!files && files.length > 0,
+		});
 
 		await startWorkflowWithMessage(newMessage.text, files);
 	}

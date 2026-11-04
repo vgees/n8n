@@ -30,6 +30,14 @@ import { useUIStore } from './ui.store';
 import AiUpdatedCodeMessage from '@/components/AiUpdatedCodeMessage.vue';
 import { useCredentialsStore } from './credentials.store';
 import { useAIAssistantHelpers } from '@/composables/useAIAssistantHelpers';
+import type { PendoAgentReaction } from '@/utils/pendoUtils';
+import {
+	PENDO_AGENT_IDS,
+	getAssistantResponseText,
+	getPendoPromptMessageId,
+	getPendoResponseMessageId,
+	trackPendoAgent,
+} from '@/utils/pendoUtils';
 
 export const MAX_CHAT_WIDTH = 425;
 export const MIN_CHAT_WIDTH = 300;
@@ -86,6 +94,8 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 	// Indicate if last sent workflow and execution data is stale
 	const workflowDataStale = ref<boolean>(true);
 	const workflowExecutionDataStale = ref<boolean>(true);
+	// Intermediate steps (tools) used by the assistant, per response id
+	const toolsUsedByResponseId = new Map<string, Set<string>>();
 
 	const assistantMessages = computed(() =>
 		chatMessages.value.filter((msg) => msg.role === 'assistant'),
@@ -128,6 +138,7 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 		lastUnread.value = undefined;
 		currentSessionActiveExecutionId.value = undefined;
 		suggestions.value = {};
+		toolsUsedByResponseId.clear();
 		nodeExecutionStatus.value = 'not_executed';
 		chatSessionCredType.value = undefined;
 		chatSessionTask.value = undefined;
@@ -219,6 +230,11 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 				});
 			} else if (msg.type === 'intermediate-step') {
 				assistantThinkingMessage.value = msg.text;
+				if (msg.step) {
+					const toolsUsed = toolsUsedByResponseId.get(id) ?? new Set<string>();
+					toolsUsed.add(msg.step);
+					toolsUsedByResponseId.set(id, toolsUsed);
+				}
 			}
 		});
 		chatMessages.value = messages;
@@ -281,10 +297,16 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 		assert(e instanceof Error);
 		stopStreaming();
 		assistantThinkingMessage.value = undefined;
+		toolsUsedByResponseId.delete(id);
 		addAssistantError(
 			locale.baseText('aiAssistant.serviceError.message', { interpolate: { message: e.message } }),
 			id,
-			retry,
+			retry
+				? async () => {
+						trackPendoReaction('retry', id);
+						await retry();
+					}
+				: undefined,
 		);
 	}
 
@@ -306,6 +328,19 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 				const firstUserMessage = usersMessages.value[0] as ChatUI.TextMessage;
 				trackUserMessage(firstUserMessage.content, false);
 			}
+			// Track the initial user prompt in Pendo now that we have a conversation id
+			const initialUserMessage = chatMessages.value.find(
+				(msg): msg is ChatUI.AssistantMessage & ChatUI.TextMessage =>
+					msg.id === id && msg.role === 'user' && msg.type === 'text',
+			);
+			if (initialUserMessage) {
+				trackPendoPrompt(
+					initialUserMessage.content,
+					id,
+					// Credentials help starts with a pre-defined question
+					chatSessionTask.value === 'credentials',
+				);
+			}
 		} else if (currentSessionId.value !== response.sessionId) {
 			return;
 		}
@@ -318,6 +353,7 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 
 	function onDoneStreaming(id: string) {
 		stopStreaming();
+		trackPendoResponse(id);
 		workflowDataStale.value = false;
 		workflowExecutionDataStale.value = false;
 		lastUnread.value = chatMessages.value.find(
@@ -619,6 +655,7 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 				(e) => handleServiceError(e, id, retry),
 			);
 			trackUserMessage(chatMessage.text, !!chatMessage.quickReplyType);
+			trackPendoPrompt(chatMessage.text, id, !!chatMessage.quickReplyType);
 		} catch (e: unknown) {
 			// in case of assert
 			handleServiceError(e, id, retry);
@@ -635,6 +672,57 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 			chat_session_id: currentSessionId.value,
 			message_number: usersMessages.value.length,
 			task: chatSessionTask.value,
+		});
+	}
+
+	function trackPendoPrompt(content: string, id: string, suggestedPrompt: boolean) {
+		if (!currentSessionId.value) {
+			return;
+		}
+		trackPendoAgent('prompt', {
+			agentId: PENDO_AGENT_IDS.assistant,
+			conversationId: currentSessionId.value,
+			messageId: getPendoPromptMessageId(id),
+			content,
+			suggestedPrompt,
+			fileUploaded: false,
+		});
+	}
+
+	function trackPendoResponse(id: string) {
+		const toolsUsed = [...(toolsUsedByResponseId.get(id) ?? [])];
+		toolsUsedByResponseId.delete(id);
+		if (!currentSessionId.value) {
+			return;
+		}
+		const content = getAssistantResponseText(
+			chatMessages.value.filter((msg) => msg.id === id && msg.role === 'assistant'),
+		);
+		if (!content) {
+			return;
+		}
+		trackPendoAgent('agent_response', {
+			agentId: PENDO_AGENT_IDS.assistant,
+			conversationId: currentSessionId.value,
+			messageId: getPendoResponseMessageId(id),
+			content,
+			toolsUsed,
+		});
+	}
+
+	/**
+	 * Tracks user feedback on an assistant response in Pendo
+	 * @param responseId id of the assistant message the reaction refers to
+	 */
+	function trackPendoReaction(reaction: PendoAgentReaction, responseId: string) {
+		if (!currentSessionId.value) {
+			return;
+		}
+		trackPendoAgent('user_reaction', {
+			agentId: PENDO_AGENT_IDS.assistant,
+			conversationId: currentSessionId.value,
+			messageId: getPendoResponseMessageId(responseId),
+			content: reaction,
 		});
 	}
 
@@ -768,6 +856,7 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 			codeDiffMessage.replaced = false;
 			codeNodeEditorEventBus.emit('codeDiffApplied');
 			showCodeUpdateToastIfNeeded(activeNode.name);
+			trackPendoReaction('undo', codeDiffMessage.id);
 		} catch (e) {
 			console.error(e);
 			codeDiffMessage.error = true;
@@ -829,6 +918,7 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 		isSessionEnded,
 		onNodeExecution,
 		trackUserOpenedAssistant,
+		trackPendoReaction,
 		closeChat,
 		openChat,
 		updateWindowWidth,

@@ -13,6 +13,7 @@ import { useWorkflowHelpers } from '@/composables/useWorkflowHelpers';
 import { useRouter } from 'vue-router';
 import { useI18n } from '@n8n/i18n';
 import { useTelemetry } from '@/composables/useTelemetry';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 import { useWorkflowSaving } from '@/composables/useWorkflowSaving';
 
 const props = defineProps<{
@@ -118,6 +119,12 @@ const save = async (): Promise<void> => {
 		if (saved) {
 			closeDialog();
 			telemetry.track('User duplicated workflow', {
+				old_workflow_id: currentWorkflowId,
+				workflow_id: props.data.id,
+				sharing_role: workflowHelpers.getWorkflowProjectRole(props.data.id),
+			});
+			// Pendo: workflow duplicate saved
+			trackPendoEvent('workflow_duplicated', {
 				old_workflow_id: currentWorkflowId,
 				workflow_id: props.data.id,
 				sharing_role: workflowHelpers.getWorkflowProjectRole(props.data.id),

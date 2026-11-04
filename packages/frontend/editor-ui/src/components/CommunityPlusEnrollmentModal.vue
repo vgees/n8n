@@ -10,6 +10,7 @@ import { useToast } from '@/composables/useToast';
 import { useUsageStore } from '@/stores/usage.store';
 import { useTelemetry } from '@/composables/useTelemetry';
 import { useUsersStore } from '@/stores/users.store';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 
 const props = defineProps<{
 	modalName: string;
@@ -64,6 +65,8 @@ const confirm = async () => {
 	isLoading.value = true;
 	try {
 		const { title, text } = await usageStore.registerCommunityEdition(email.value);
+		// Pendo: Community Plus license registration succeeded
+		trackPendoEvent('community_plus_registered', { success: true });
 		closeModal();
 		toast.showMessage({
 			title: title ?? i18n.baseText('communityPlusModal.success.title'),
@@ -76,6 +79,8 @@ const confirm = async () => {
 			duration: 0,
 		});
 	} catch (error) {
+		// Pendo: Community Plus license registration failed
+		trackPendoEvent('community_plus_registered', { success: false });
 		toast.showError(error, i18n.baseText('communityPlusModal.error.title'));
 	} finally {
 		isLoading.value = false;

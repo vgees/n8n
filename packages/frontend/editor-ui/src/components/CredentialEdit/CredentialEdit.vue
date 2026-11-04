@@ -43,6 +43,7 @@ import { createEventBus } from '@n8n/utils/event-bus';
 import { useExternalHooks } from '@/composables/useExternalHooks';
 import { useI18n } from '@n8n/i18n';
 import { useTelemetry } from '@/composables/useTelemetry';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 import { useProjectsStore } from '@/stores/projects.store';
 import { isExpression, isTestableExpression } from '@/utils/expressions';
 import {
@@ -765,6 +766,17 @@ async function saveCredential(): Promise<ICredentialsResponse | null> {
 		 */
 		if (!isOAuthType.value) {
 			telemetry.track('User saved credentials', trackProperties);
+			// Pendo: non-OAuth credential saved (OAuth types are tracked when the OAuth flow ends)
+			trackPendoEvent('credential_saved', {
+				credential_type: credentialDetails.type,
+				credential_id: credential.id,
+				is_new: isNewCredential,
+				is_valid: isCredentialTestable.value ? !!testedSuccessfully.value : undefined,
+				is_complete: !!requiredPropertiesFilled.value,
+				uses_external_secrets: usesExternalSecrets(credentialDetails.data ?? {}),
+				node_type: ndvStore.activeNode?.type,
+				authError: authError.value ? authError.value.slice(0, 100) : undefined,
+			});
 		}
 
 		await externalHooks.run('credentialEdit.saveCredential', trackProperties);
@@ -836,6 +848,12 @@ async function createCredential(
 	});
 
 	telemetry.track('User created credentials', {
+		credential_type: credentialDetails.type,
+		credential_id: credential.id,
+		workflow_id: workflowsStore.workflowId,
+	});
+	// Pendo: new credential created through the API
+	trackPendoEvent('credential_created', {
 		credential_type: credentialDetails.type,
 		credential_id: credential.id,
 		workflow_id: workflowsStore.workflowId,
@@ -1001,6 +1019,16 @@ async function oAuthCredentialAuthorize() {
 		}
 
 		telemetry.track('User saved credentials', trackProperties);
+		// Pendo: OAuth credential saved at the end of the OAuth flow
+		trackPendoEvent('credential_saved', {
+			credential_type: credentialTypeName.value,
+			credential_id: credentialId.value,
+			is_new: props.mode === 'new' && !credentialId.value,
+			is_valid: successfullyConnected,
+			is_complete: !!requiredPropertiesFilled.value,
+			uses_external_secrets: usesExternalSecrets(credentialData.value),
+			node_type: ndvStore.activeNode?.type,
+		});
 
 		if (successfullyConnected) {
 			oauthChannel.removeEventListener('message', receiveMessage);

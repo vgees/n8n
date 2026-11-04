@@ -8,6 +8,7 @@ import MfaView from './MfaView.vue';
 import { useToast } from '@/composables/useToast';
 import { useI18n } from '@n8n/i18n';
 import { useTelemetry } from '@/composables/useTelemetry';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 
 import { useUsersStore } from '@/stores/users.store';
 import { useSettingsStore } from '@/stores/settings.store';
@@ -154,6 +155,11 @@ const login = async (form: LoginRequestDto) => {
 		telemetry.track('User attempted to login', {
 			result: showMfaView.value ? 'mfa_success' : 'success',
 		});
+		// Pendo: sign-in attempt resolved successfully
+		trackPendoEvent('user_login_completed', {
+			result: showMfaView.value ? 'mfa_success' : 'success',
+			mfa_used: showMfaView.value,
+		});
 
 		if (isRedirectSafe()) {
 			const redirect = getRedirectQueryParameter();
@@ -176,6 +182,11 @@ const login = async (form: LoginRequestDto) => {
 
 		telemetry.track('User attempted to login', {
 			result: showMfaView.value ? 'mfa_token_rejected' : 'credentials_error',
+		});
+		// Pendo: sign-in attempt resolved with an error
+		trackPendoEvent('user_login_completed', {
+			result: showMfaView.value ? 'mfa_token_rejected' : 'credentials_error',
+			mfa_used: showMfaView.value,
 		});
 
 		if (!showMfaView.value) {

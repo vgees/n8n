@@ -10,6 +10,7 @@ import { useUIStore } from '@/stores/ui.store';
 import type { ProjectListItem, ProjectSharingData } from '@/types/projects.types';
 import { ResourceType } from '@/utils/projects.utils';
 import { getPushPriorityByStatus, getStatusText, getStatusTheme } from '@/utils/sourceControlUtils';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 import {
 	type SourceControlledFile,
 	SOURCE_CONTROL_FILE_LOCATION,
@@ -372,6 +373,12 @@ async function commitAndPush() {
 		.concat(changes.value.credential.filter((file) => selectedCredentials.has(file.id)))
 		.concat(changes.value.folders)
 		.concat(changes.value.workflow.filter((file) => selectedWorkflows.has(file.id)));
+	const pendoPushProperties = {
+		workflow_count: selectedWorkflows.size,
+		credential_count: selectedCredentials.size,
+		variables_included: changes.value.variables.length > 0,
+		tags_included: changes.value.tags.length > 0,
+	};
 	loadingService.startLoading(i18n.baseText('settings.sourceControl.loading.push'));
 	close();
 
@@ -381,6 +388,8 @@ async function commitAndPush() {
 			commitMessage: commitMessage.value,
 			fileNames: files,
 		});
+		// Pendo: push to source control resolved successfully
+		trackPendoEvent('source_control_push_completed', { ...pendoPushProperties, success: true });
 
 		toast.showToast({
 			title: i18n.baseText('settings.sourceControl.modals.push.success.title'),
@@ -388,6 +397,8 @@ async function commitAndPush() {
 			type: 'success',
 		});
 	} catch (error) {
+		// Pendo: push to source control failed
+		trackPendoEvent('source_control_push_completed', { ...pendoPushProperties, success: false });
 		toast.showError(error, i18n.baseText('error'));
 	} finally {
 		loadingService.stopLoading();

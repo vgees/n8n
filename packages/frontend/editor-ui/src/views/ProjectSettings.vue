@@ -16,6 +16,7 @@ import ProjectRoleUpgradeDialog from '@/components/Projects/ProjectRoleUpgradeDi
 import { useRolesStore } from '@/stores/roles.store';
 import { useCloudPlanStore } from '@/stores/cloudPlan.store';
 import { useTelemetry } from '@/composables/useTelemetry';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 import { useDocumentTitle } from '@/composables/useDocumentTitle';
 import ProjectHeader from '@/components/Projects/ProjectHeader.vue';
 
@@ -171,6 +172,13 @@ const sendTelemetry = (diff: FormDataDiff) => {
 				target_user_id: r.id,
 				role: r.role,
 			});
+			// Pendo: member added to project
+			trackPendoEvent('project_members_updated', {
+				project_id: projectsStore.currentProject?.id,
+				target_user_id: r.id,
+				role: r.role,
+				change_type: 'added',
+			});
 		});
 	}
 
@@ -179,6 +187,12 @@ const sendTelemetry = (diff: FormDataDiff) => {
 			telemetry.track('User removed member from project', {
 				project_id: projectsStore.currentProject?.id,
 				target_user_id: r.id,
+			});
+			// Pendo: member removed from project
+			trackPendoEvent('project_members_updated', {
+				project_id: projectsStore.currentProject?.id,
+				target_user_id: r.id,
+				change_type: 'removed',
 			});
 		});
 	}
@@ -189,6 +203,13 @@ const sendTelemetry = (diff: FormDataDiff) => {
 				project_id: projectsStore.currentProject?.id,
 				target_user_id: r.id,
 				role: r.role,
+			});
+			// Pendo: member role changed on project
+			trackPendoEvent('project_members_updated', {
+				project_id: projectsStore.currentProject?.id,
+				target_user_id: r.id,
+				role: r.role,
+				change_type: 'role_changed',
 			});
 		});
 	}

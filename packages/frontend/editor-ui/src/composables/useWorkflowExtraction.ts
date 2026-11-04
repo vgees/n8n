@@ -24,6 +24,7 @@ import { PUSH_NODES_OFFSET } from '@/utils/nodeViewUtils';
 import { useUIStore } from '@/stores/ui.store';
 import { useNodeTypesStore } from '@/stores/nodeTypes.store';
 import { useTelemetry } from './useTelemetry';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 import isEqual from 'lodash/isEqual';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -497,6 +498,13 @@ export function useWorkflowExtraction() {
 			subGraph,
 			afterNodes,
 		);
+
+		// Pendo: selected nodes successfully extracted into a new sub-workflow
+		trackPendoEvent('nodes_extracted_to_subworkflow', {
+			node_count: subGraph.length,
+			workflow_id: workflowsStore.workflowId,
+			sub_workflow_id: createdWorkflow.id,
+		});
 
 		return true;
 	}

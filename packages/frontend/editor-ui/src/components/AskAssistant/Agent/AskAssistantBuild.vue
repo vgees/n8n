@@ -9,6 +9,7 @@ import { nodeViewEventBus } from '@/event-bus';
 import { v4 as uuid } from 'uuid';
 import { useI18n } from '@n8n/i18n';
 import { STICKY_NODE_TYPE } from '@/constants';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 
 const emit = defineEmits<{
 	close: [];
@@ -88,6 +89,12 @@ function onInsertWorkflow(code: string) {
 		prompt: builderStore.workflowPrompt,
 		latency: new Date().getTime() - generationStartTime.value,
 		workflow_json: generatedWorkflowJson.value,
+	});
+	// Pendo: AI builder generated a workflow (raw prompt/workflow JSON intentionally excluded)
+	trackPendoEvent('workflow_generated_from_prompt', {
+		latency: new Date().getTime() - generationStartTime.value,
+		node_count: workflowData.nodes?.length ?? 0,
+		success: true,
 	});
 
 	nodeViewEventBus.emit('importWorkflowData', {

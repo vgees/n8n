@@ -5,6 +5,7 @@ import { onMounted, ref } from 'vue';
 import { useUIStore } from '@/stores/ui.store';
 import { createEventBus } from '@n8n/utils/event-bus';
 import { useTelemetry } from '@/composables/useTelemetry';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 import { useI18n } from '@n8n/i18n';
 
 const telemetry = useTelemetry();
@@ -57,6 +58,12 @@ function sendTelemetry(
 	},
 ): void {
 	telemetry.track('User imported curl command', {
+		success: data.success,
+		invalidProtocol: data.invalidProtocol,
+		protocol: data.protocol,
+	});
+	// Pendo: cURL command parse outcome
+	trackPendoEvent('curl_command_imported', {
 		success: data.success,
 		invalidProtocol: data.invalidProtocol,
 		protocol: data.protocol,

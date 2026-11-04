@@ -17,6 +17,7 @@ import { useSettingsStore } from './settings.store';
 import { assert } from '@n8n/utils/assert';
 import { useI18n } from '@n8n/i18n';
 import { useTelemetry } from '@/composables/useTelemetry';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 import { useUIStore } from './ui.store';
 import { usePostHog } from './posthog.store';
 import { useNodeTypesStore } from './nodeTypes.store';
@@ -231,6 +232,11 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 		telemetry.track('Workflow generation errored', {
 			error: e.message,
 			prompt: workflowPrompt.value,
+		});
+		// Pendo: AI workflow builder service returned an error (prompt intentionally excluded).
+		// The reserved `error` property name is avoided in favour of `error_message`.
+		trackPendoEvent('workflow_generation_errored', {
+			error_message: e.message.slice(0, 200),
 		});
 	}
 

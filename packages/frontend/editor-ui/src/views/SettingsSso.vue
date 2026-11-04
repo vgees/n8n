@@ -7,6 +7,7 @@ import { useTelemetry } from '@/composables/useTelemetry';
 import { useToast } from '@/composables/useToast';
 import { MODAL_CONFIRM } from '@/constants';
 import { useSSOStore } from '@/stores/sso.store';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 import { useI18n } from '@n8n/i18n';
 import { useRootStore } from '@n8n/stores/useRootStore';
 import { computed, onMounted, ref } from 'vue';
@@ -153,6 +154,13 @@ const trackUpdateSettings = () => {
 		trackingMetadata.is_active = ssoStore.isOidcLoginEnabled;
 	}
 	telemetry.track('User updated single sign on settings', trackingMetadata);
+	// Pendo: SSO settings saved (discovery endpoint URL intentionally omitted)
+	trackPendoEvent('sso_settings_updated', {
+		instance_id: trackingMetadata.instance_id,
+		authentication_method: trackingMetadata.authentication_method,
+		is_active: trackingMetadata.is_active,
+		identity_provider_metadata_type: trackingMetadata.identity_provider,
+	});
 };
 
 const onSave = async () => {

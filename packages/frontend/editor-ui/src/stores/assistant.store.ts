@@ -25,6 +25,7 @@ import { useNDVStore } from './ndv.store';
 import type { IUpdateInformation } from '@/Interface';
 import { useI18n } from '@n8n/i18n';
 import { useTelemetry } from '@/composables/useTelemetry';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 import { useToast } from '@/composables/useToast';
 import { useUIStore } from './ui.store';
 import AiUpdatedCodeMessage from '@/components/AiUpdatedCodeMessage.vue';
@@ -631,6 +632,13 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 		}
 		telemetry.track('User sent message in Assistant', {
 			message,
+			is_quick_reply: isQuickReply,
+			chat_session_id: currentSessionId.value,
+			message_number: usersMessages.value.length,
+			task: chatSessionTask.value,
+		});
+		// Pendo: user message sent to the AI Assistant (raw message text intentionally excluded)
+		trackPendoEvent('assistant_message_sent', {
 			is_quick_reply: isQuickReply,
 			chat_session_id: currentSessionId.value,
 			message_number: usersMessages.value.length,

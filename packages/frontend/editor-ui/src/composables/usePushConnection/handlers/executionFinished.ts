@@ -27,6 +27,13 @@ import { useNodeHelpers } from '@/composables/useNodeHelpers';
 import { useNodeTypesStore } from '@/stores/nodeTypes.store';
 import { useRunWorkflow } from '@/composables/useRunWorkflow';
 import { useWorkflowSaving } from '@/composables/useWorkflowSaving';
+import { trackPendoEvent } from '@/utils/pendoUtils';
+
+/**
+ * Execution IDs already reported to Pendo, so a repeated push message for the
+ * same execution does not fire `manual_execution_finished` twice.
+ */
+const pendoTrackedExecutionIds = new Set<string>();
 
 export type SimplifiedExecution = Pick<
 	IExecutionResponse,
@@ -99,6 +106,8 @@ export async function executionFinished(
 	const runExecutionData = getRunExecutionData(execution);
 	uiStore.setProcessingExecutionResults(false);
 
+	trackManualExecutionFinished(execution, workflow?.meta?.templateId);
+
 	if (execution.data?.waitTill !== undefined) {
 		handleExecutionFinishedWithWaitTill(options);
 	} else if (execution.status === 'error' || execution.status === 'canceled') {
@@ -110,6 +119,27 @@ export async function executionFinished(
 	setRunExecutionData(execution, runExecutionData);
 
 	continueEvaluationLoop(execution, options.router);
+}
+
+/**
+ * Sends the Pendo `manual_execution_finished` event once per execution.
+ */
+function trackManualExecutionFinished(execution: SimplifiedExecution, templateId?: string) {
+	if (pendoTrackedExecutionIds.has(execution.id)) return;
+	pendoTrackedExecutionIds.add(execution.id);
+
+	const startedAt = execution.startedAt ? new Date(execution.startedAt).getTime() : NaN;
+	const stoppedAt = execution.stoppedAt ? new Date(execution.stoppedAt).getTime() : NaN;
+	const durationMs = stoppedAt - startedAt;
+
+	trackPendoEvent('manual_execution_finished', {
+		workflow_id: execution.workflowId,
+		execution_id: execution.id,
+		status: execution.status,
+		duration_ms: Number.isFinite(durationMs) ? durationMs : undefined,
+		is_waiting: execution.data?.waitTill !== undefined,
+		template_id: templateId,
+	});
 }
 
 /**

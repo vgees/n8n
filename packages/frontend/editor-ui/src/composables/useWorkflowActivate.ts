@@ -16,6 +16,7 @@ import { useI18n } from '@n8n/i18n';
 import { ref } from 'vue';
 import { useNpsSurveyStore } from '@/stores/npsSurvey.store';
 import { useWorkflowSaving } from './useWorkflowSaving';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 
 export function useWorkflowActivate() {
 	const updatingWorkflowActivation = ref(false);
@@ -94,7 +95,11 @@ export function useWorkflowActivate() {
 				{ workflowId: currWorkflowId, active: newActiveState },
 				!uiStore.stateIsDirty,
 			);
+			// Pendo: workflow activation state confirmed by the API
+			trackPendoEvent('workflow_activation_changed', { ...telemetryPayload, success: true });
 		} catch (error) {
+			// Pendo: workflow activation update failed
+			trackPendoEvent('workflow_activation_changed', { ...telemetryPayload, success: false });
 			const newStateName = newActiveState ? 'activated' : 'deactivated';
 			toast.showError(
 				error,

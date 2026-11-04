@@ -14,6 +14,7 @@ import { useExternalHooks } from '@/composables/useExternalHooks';
 import { useTelemetry } from '@/composables/useTelemetry';
 import { useCredentialSetupState } from '@/views/SetupWorkflowFromTemplateView/useCredentialSetupState';
 import { tryToParseNumber } from '@/utils/typesUtils';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 
 export type NodeAndType = {
 	node: INodeUi;
@@ -211,6 +212,14 @@ export const useSetupTemplateStore = defineStore('setupTemplate', () => {
 				template_id: tryToParseNumber(templateId.value),
 				workflow_id: createdWorkflow.id,
 				wf_template_repo_session_id: templatesStore.currentSessionId,
+			});
+			// Pendo: workflow created from template and saved
+			trackPendoEvent('workflow_created_from_template', {
+				template_id: tryToParseNumber(templateId.value),
+				workflow_id: createdWorkflow.id,
+				wf_template_repo_session_id: templatesStore.currentSessionId,
+				creds_filled: numFilledCredentials.value,
+				creds_needed: credentialUsages.value.length,
 			});
 
 			// Replace the URL so back button doesn't come back to this setup view

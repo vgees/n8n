@@ -109,6 +109,7 @@ import type { CanvasLayoutEvent } from './useCanvasLayout';
 import { chatEventBus } from '@n8n/chat/event-buses';
 import { useLogsStore } from '@/stores/logs.store';
 import { isChatNode } from '@/utils/aiUtils';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 import cloneDeep from 'lodash/cloneDeep';
 import uniq from 'lodash/uniq';
 
@@ -1934,6 +1935,15 @@ export function useCanvasOperations() {
 				trackHistory,
 				viewport,
 			});
+
+			if (source !== 'paste' && source !== 'duplicate') {
+				// Pendo: workflow data successfully imported onto the canvas
+				trackPendoEvent('workflow_imported', {
+					source,
+					workflow_id: workflowsStore.workflowId,
+					node_count: workflowData.nodes?.length ?? 0,
+				});
+			}
 
 			if (importTags && settingsStore.areTagsEnabled && Array.isArray(workflowData.tags)) {
 				await importWorkflowTags(workflowData);

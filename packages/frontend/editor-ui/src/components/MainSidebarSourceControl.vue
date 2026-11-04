@@ -11,6 +11,7 @@ import { useSourceControlStore } from '@/stores/sourceControl.store';
 import { SOURCE_CONTROL_PULL_MODAL_KEY, SOURCE_CONTROL_PUSH_MODAL_KEY } from '@/constants';
 import { sourceControlEventBus } from '@/event-bus/source-control';
 import { notifyUserAboutPullWorkFolderOutcome } from '@/utils/sourceControlUtils';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 import { useProjectsStore } from '@/stores/projects.store';
 
 defineProps<{
@@ -90,11 +91,29 @@ async function pullWorkfolder() {
 	try {
 		const status = await sourceControlStore.pullWorkfolder(false);
 
+		// Pendo: pull from source control resolved
+		trackPendoEvent('source_control_pull_completed', {
+			changed_resource_count: status?.length ?? 0,
+			has_conflicts: false,
+			outcome: status?.length ? 'success' : 'up_to_date',
+		});
+
 		await notifyUserAboutPullWorkFolderOutcome(status, toast);
 
 		sourceControlEventBus.emit('pull');
 	} catch (error) {
 		const errorResponse = error.response;
+		const hasConflicts = errorResponse?.status === responseStatuses.CONFLICT;
+
+		// Pendo: pull from source control hit a conflict or failed
+		trackPendoEvent('source_control_pull_completed', {
+			changed_resource_count:
+				hasConflicts && Array.isArray(errorResponse.data?.data)
+					? errorResponse.data.data.length
+					: 0,
+			has_conflicts: hasConflicts,
+			outcome: hasConflicts ? 'conflict' : 'error',
+		});
 
 		if (errorResponse?.status === responseStatuses.CONFLICT) {
 			uiStore.openModalWithData({

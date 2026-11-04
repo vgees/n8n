@@ -9,6 +9,7 @@ import { useToast } from '@/composables/useToast';
 import { useI18n } from '@n8n/i18n';
 import { useEvaluationStore } from '@/stores/evaluation.store.ee';
 import { useNodeTypesStore } from '@/stores/nodeTypes.store';
+import { trackPendoEvent } from '@/utils/pendoUtils';
 
 import { computed, watch } from 'vue';
 import { N8nLink, N8nText } from '@n8n/design-system';
@@ -47,8 +48,15 @@ const showWizard = computed(() => !hasRuns.value);
 
 // Method to run a test - will be used by the SetupWizard component
 async function runTest() {
+	const isFirstRun = !hasRuns.value;
 	try {
-		await evaluationStore.startTestRun(props.name);
+		const result = await evaluationStore.startTestRun(props.name);
+		// Pendo: evaluation test run started successfully (API does not return a test run ID)
+		trackPendoEvent('evaluation_test_run_started', {
+			workflow_id: props.name,
+			is_first_run: isFirstRun,
+			success: result?.success ?? true,
+		});
 	} catch (error) {
 		toast.showError(error, locale.baseText('evaluation.listRuns.error.cantStartTestRun'));
 		return;

@@ -36,6 +36,7 @@ import { useTelemetry } from '@/composables/useTelemetry';
 import { useSettingsStore } from '@/stores/settings.store';
 import * as onboardingApi from '@/api/workflow-webhooks';
 import * as promptsApi from '@n8n/rest-api-client/api/prompts';
+import { clearPendoSession, identifyPendoUser } from '@/plugins/pendo';
 
 const _isPendingUser = (user: IUserResponse | null) => !!user?.isPending;
 const _isInstanceOwner = (user: IUserResponse | null) => user?.role === ROLE.Owner;
@@ -156,6 +157,7 @@ export const useUsersStore = defineStore(STORES.USERS, () => {
 		const defaultScopes: Scope[] = [];
 		RBACStore.setGlobalScopes(user.globalScopes || defaultScopes);
 		telemetry.identify(rootStore.instanceId, user.id);
+		identifyPendoUser(usersById.value[user.id]);
 		postHogStore.init(user.featureFlags);
 		npsSurveyStore.setupNpsSurveyOnLogin(user.id, user.settings);
 	};
@@ -188,6 +190,7 @@ export const useUsersStore = defineStore(STORES.USERS, () => {
 		currentUserId.value = null;
 		currentUserCloudInfo.value = null;
 		telemetry.reset();
+		clearPendoSession();
 		RBACStore.setGlobalScopes([]);
 	};
 

@@ -12,6 +12,7 @@ import { useClipboard } from '@/composables/useClipboard';
 import { useToast } from '@/composables/useToast';
 import LogsPanelHeader from '@/features/logs/components/LogsPanelHeader.vue';
 import { N8nButton, N8nIconButton, N8nTooltip } from '@n8n/design-system';
+import { PENDO_AGENT_IDS, trackPendoAgent } from '@/utils/pendoUtils';
 
 interface Props {
 	pastChatMessages: string[];
@@ -61,6 +62,12 @@ function isTextMessage(message: ChatMessage): message is ChatMessageText {
 
 /** Reposts the message */
 function repostMessage(message: ChatMessageText) {
+	trackPendoAgent('user_reaction', {
+		agentId: PENDO_AGENT_IDS.workflowAgentChat,
+		conversationId: props.sessionId,
+		messageId: message.id,
+		content: 'retry',
+	});
 	void sendMessage(message.text);
 }
 

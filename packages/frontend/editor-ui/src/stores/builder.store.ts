@@ -21,6 +21,14 @@ import { useUIStore } from './ui.store';
 import { usePostHog } from './posthog.store';
 import { useNodeTypesStore } from './nodeTypes.store';
 import { DEFAULT_CHAT_WIDTH, MAX_CHAT_WIDTH, MIN_CHAT_WIDTH } from './assistant.store';
+import type { PendoAgentReaction } from '@/utils/pendoUtils';
+import {
+	PENDO_AGENT_IDS,
+	getAssistantResponseText,
+	getPendoPromptMessageId,
+	getPendoResponseMessageId,
+	trackPendoAgent,
+} from '@/utils/pendoUtils';
 
 export const ENABLED_VIEWS = [...EDITABLE_CANVAS_VIEWS];
 
@@ -226,7 +234,12 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 		addAssistantError(
 			locale.baseText('aiAssistant.serviceError.message', { interpolate: { message: e.message } }),
 			id,
-			retry,
+			retry
+				? async () => {
+						trackPendoReaction('retry', id);
+						await retry();
+					}
+				: undefined,
 		);
 		telemetry.track('Workflow generation errored', {
 			error: e.message,
@@ -250,6 +263,14 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 				},
 				{ withPostHog: true },
 			);
+			// Track the initial user prompt in Pendo now that we have a conversation id
+			const initialUserMessage = chatMessages.value.find(
+				(msg): msg is ChatUI.AssistantMessage & ChatUI.TextMessage =>
+					msg.id === id && msg.role === 'user' && msg.type === 'text',
+			);
+			if (initialUserMessage) {
+				trackPendoPrompt(initialUserMessage.content, id);
+			}
 		} else if (currentSessionId.value !== response.sessionId) {
 			// Ignore messages from other sessions
 			return;
@@ -257,8 +278,57 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 		addAssistantMessages(response.messages, id);
 	}
 
-	function onDoneStreaming() {
+	function onDoneStreaming(id: string) {
 		stopStreaming();
+		trackPendoResponse(id);
+	}
+
+	function trackPendoPrompt(content: string, id: string) {
+		if (!currentSessionId.value) {
+			return;
+		}
+		trackPendoAgent('prompt', {
+			agentId: PENDO_AGENT_IDS.workflowBuilder,
+			conversationId: currentSessionId.value,
+			messageId: getPendoPromptMessageId(id),
+			content,
+			suggestedPrompt: false,
+			fileUploaded: false,
+		});
+	}
+
+	function trackPendoResponse(id: string) {
+		if (!currentSessionId.value) {
+			return;
+		}
+		const content = getAssistantResponseText(
+			chatMessages.value.filter((msg) => msg.id === id && msg.role === 'assistant'),
+		);
+		if (!content) {
+			return;
+		}
+		trackPendoAgent('agent_response', {
+			agentId: PENDO_AGENT_IDS.workflowBuilder,
+			conversationId: currentSessionId.value,
+			messageId: getPendoResponseMessageId(id),
+			content,
+		});
+	}
+
+	/**
+	 * Tracks user feedback on a builder response in Pendo
+	 * @param responseId id of the assistant message the reaction refers to
+	 */
+	function trackPendoReaction(reaction: PendoAgentReaction, responseId: string) {
+		if (!currentSessionId.value) {
+			return;
+		}
+		trackPendoAgent('user_reaction', {
+			agentId: PENDO_AGENT_IDS.workflowBuilder,
+			conversationId: currentSessionId.value,
+			messageId: getPendoResponseMessageId(responseId),
+			content: reaction,
+		});
 	}
 
 	// Core API functions
@@ -294,7 +364,7 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 				payload,
 			},
 			(msg) => onEachStreamingMessage(msg, id),
-			() => onDoneStreaming(),
+			() => onDoneStreaming(id),
 			(e) => handleServiceError(e, id, async () => await initBuilderChat(userMessage, 'chat')),
 		);
 	}
@@ -332,9 +402,10 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 					sessionId: currentSessionId.value,
 				},
 				(msg) => onEachStreamingMessage(msg, id),
-				() => onDoneStreaming(),
+				() => onDoneStreaming(id),
 				(e) => handleServiceError(e, id, retry),
 			);
+			trackPendoPrompt(chatMessage.text, id);
 		} catch (e: unknown) {
 			// in case of assert
 			handleServiceError(e, id, retry);
@@ -371,5 +442,6 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 		sendMessage,
 		addAssistantMessages,
 		handleServiceError,
+		trackPendoReaction,
 	};
 });

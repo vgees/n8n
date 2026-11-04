@@ -114,6 +114,18 @@ function onNewWorkflow() {
 	generationStartTime.value = new Date().getTime();
 }
 
+function trackPendoRating() {
+	const generatedWorkflowMessage = builderStore.chatMessages.find(
+		(msg) => msg.type === 'workflow-generated',
+	);
+	if (generatedWorkflowMessage) {
+		builderStore.trackPendoReaction(
+			helpful.value ? 'positive' : 'negative',
+			generatedWorkflowMessage.id,
+		);
+	}
+}
+
 function onThumbsUp() {
 	helpful.value = true;
 	telemetry.track('User rated workflow generation', {
@@ -121,6 +133,7 @@ function onThumbsUp() {
 		prompt: builderStore.workflowPrompt,
 		workflow_json: generatedWorkflowJson.value,
 	});
+	trackPendoRating();
 }
 
 function onThumbsDown() {
@@ -130,6 +143,7 @@ function onThumbsDown() {
 		prompt: builderStore.workflowPrompt,
 		workflow_json: generatedWorkflowJson.value,
 	});
+	trackPendoRating();
 }
 
 function onSubmitFeedback(feedback: string) {
